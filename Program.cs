@@ -20,6 +20,7 @@ class Area
     public float X;
     public float Y;
     public HashSet<Area> Neighbors = new HashSet<Area>();
+    public bool IsEdge;
 
     public void Connect(Area other)
     {
@@ -37,6 +38,7 @@ class AreaReduced
     public float X;
     public float Y;
     public List<int[]> Neighbors;
+    public bool IsEdge;
 
     static int[] EncodeColor(Rgba32 c) => new int[]{c.R, c.G, c.B, c.A};
 
@@ -52,6 +54,7 @@ class AreaReduced
         Points = area.Points;
         X = area.X;
         Y = area.Y;
+        IsEdge = area.IsEdge;
     }
 }
 
@@ -64,7 +67,7 @@ class JsonResult
 
 class Program
 {
-    static void Process(string imagePath, bool listMinAreaLocs)
+    static void Process(string imagePath, bool listMinAreaLocs, bool indent)
     {
         // var stopWatch = new System.Diagnostics.Stopwatch();
         // stopWatch.Restart();
@@ -85,7 +88,6 @@ class Program
 
         var remapImg = new Image<Rgba32>(width, height);
         for(int y=0; y<height; y++)
-        {
             for(int x=0; x<width; x++)
             {
                 // var baseColor = img.GetPixel(x, y);
@@ -105,8 +107,9 @@ class Program
                 area.Points += 1;
                 area.X += x;
                 area.Y += y;
+                if(x == 0 || y == 0 || y == height - 1 || x == height - 1)
+                    area.IsEdge = true;
             }
-        }
 
         foreach(var area in areaMap.Values)
         {
@@ -149,7 +152,12 @@ class Program
         var reduceIter = from area in areaMap.Values select new AreaReduced(area);
         var res = new JsonResult(reduceIter.ToList());
 
-        var jsonString = JsonConvert.SerializeObject(res);
+        string jsonString;
+        if(indent)
+            jsonString = JsonConvert.SerializeObject(res, Formatting.Indented); // Well, I would like a custom depth, though.
+        else
+            jsonString = JsonConvert.SerializeObject(res);
+        
         File.WriteAllText(path + "_data.json", jsonString);
 
         // Diagnosis
@@ -185,17 +193,19 @@ class Program
         
         var imgPathArg = new Argument<string>("imgPath", "The path of image");
         var listMinAreaLocs = new Option<bool>("--list-min-locs", "List locations of points of the area which has min points");
+        var indent = new Option<bool>("--indent", "Prints indent for JSON output");
 
         var rootCommand = new RootCommand
         {
             imgPathArg,
-            listMinAreaLocs
+            listMinAreaLocs,
+            indent
         };
 
         rootCommand.Description = "Pixel based map processor. You can drag path into command line at most system.";
 
         // rootCommand.Handler = 
-        rootCommand.SetHandler((string p, bool l) => Process(p, l), imgPathArg, listMinAreaLocs);
+        rootCommand.SetHandler((string p, bool l, bool i) => Process(p, l, i), imgPathArg, listMinAreaLocs, indent);
 
         var stopWatch = new System.Diagnostics.Stopwatch();
         stopWatch.Restart();
